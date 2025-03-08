@@ -2,12 +2,7 @@
 // #![no_main] // todo
 
 use std::{
-    collections::VecDeque,
-    fmt::Debug,
-    sync::{Arc, Mutex, mpsc::{self, Sender, Receiver}},
-    fs::File,
-    io::BufWriter,
-    thread,
+    collections::VecDeque, fmt::Debug, fs::File, io::BufWriter, sync::{mpsc::{self, Receiver, Sender}, Arc, Mutex}, thread
 };
 
 use cpal::{
@@ -16,12 +11,20 @@ use cpal::{
 
 use hound::{WavSpec, WavWriter};
 
-fn write_input_data<T, U>(data: &[T], writer: &Arc<Mutex<WavWriter<BufWriter<File>>>>)
+use chrono::Local;
+
+fn write_input_data<T, U>(data: &[T], config: &cpal::StreamConfig)
 where
     T: Sample,
     U: Sample + hound::Sample + FromSample<T>,
 {
-    let mut writer = writer.lock().unwrap();
+    let filename = format!("{}.wav", Local::now().format("%Y-%m-%d_%H:%M:%S"));
+    let path = std::env::current_dir().unwrap().join(&filename);
+    println!("{path:?}");
+    std::fs::File::create(path).unwrap();
+
+    let spec = WavSpec { channels: config.channels, bits_per_sample: 32, sample_format: hound::SampleFormat::Float, sample_rate: config.sample_rate.0};
+    let mut writer = WavWriter::create(filename, spec).unwrap();
     for &sample in data {
         writer.write_sample(sample.to_sample::<U>()).ok();
     }
@@ -30,8 +33,10 @@ where
 const BUFF_LEN: usize = 2_usize.pow(24);
 
 fn main() {
-    //!TODO change from Vec to just f32 and loop
     let (tx, rx): (Sender<f32>, Receiver<f32>) = mpsc::channel();
+
+    //TODO create another channel for signalling termination to child threads
+
     let buff = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(BUFF_LEN)));
     let host = cpal::host_from_id(cpal::HostId::Jack).unwrap_or(cpal::default_host());
     let device = host
@@ -48,16 +53,15 @@ fn main() {
         .with_max_sample_rate()
         .config();
 
-    let spec = WavSpec { channels: config.channels, bits_per_sample: 32, sample_format: hound::SampleFormat::Float, sample_rate: config.sample_rate.0};
-    let writer = Arc::new(Mutex::new(WavWriter::create("output.wav", spec).unwrap()));
 
     let buff_clone = buff.clone();
+    let config_clone = config.clone();
     // let writer_clone = writer.clone();
 
     
     let read_handle = thread::spawn(move || {
         let stream = device.build_input_stream(
-            &config,
+            &config_clone,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                 // let mut lock = buff_clone
                 //     .lock()
@@ -67,7 +71,10 @@ fn main() {
                 // write_input_data::<f32, f32>(data, &&writer_clone);
                 // println!("data!");
                 for point in data {
-                    tx.send(*point).unwrap();
+                    match tx.send(*point) {
+                        Ok(_) => {},
+                        Err(_) => panic!("Exiting due to send channel error...")
+                    }
                 }
             },
             move |err| {
@@ -83,7 +90,7 @@ fn main() {
         loop {
             let data = match rx.recv() {
                 Ok(d) => d,
-                Err(e) => { eprintln!("{e:#?}"); continue; }
+                Err(_) => { panic!("Exiting due to recv channel error...") }
             };
 
             let mut lock = buff_clone.lock().unwrap();
@@ -91,13 +98,16 @@ fn main() {
         }
     });
 
+    let mut line = String::new();
     loop {
-        let _ = std::io::stdin().read_line(&mut String::new());
+        let _ = std::io::stdin().read_line(&mut line);
+        if line == "q" { break }
         let mut lock = buff.lock().unwrap();
         println!("Saving data...");
-        write_input_data::<f32, f32>(lock.make_contiguous(), &writer);
+        write_input_data::<f32, f32>(lock.make_contiguous(), &config);
     }
 
+    //TODO send signals to children to exit
 }
 
 fn print(data: impl Debug) {

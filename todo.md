@@ -1,6 +1,8 @@
 # TODO
 ## High Priority
-- [ ] Get cpal recording working
-- [ ] Implement threadding
+- [x] Get cpal recording working
+- [x] Implement threadding
+    - [ ] Optimize threadding
 ## Low Priority
 - [ ] Add an ascii/unicode audio visualizer?
+- [ ] Guarantee child thread cleanup (signal trapping?)

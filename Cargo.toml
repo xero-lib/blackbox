@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+chrono = "0.4.40"
 cpal = { version = "0.15.3", features = ["asio", "jack"] }
 hound = "3.5.1"
