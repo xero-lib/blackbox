@@ -2,7 +2,7 @@
 // #![no_main] // todo
 
 use std::{
-    collections::VecDeque, fmt::Debug, fs::File, io::BufWriter, sync::{mpsc::{self, Receiver, Sender}, Arc, Mutex}, thread
+    collections::VecDeque, fmt::Debug, fs::File, sync::{mpsc::{self, Receiver, Sender}, Arc, Mutex}, thread
 };
 
 use cpal::{
@@ -19,7 +19,7 @@ where
     U: Sample + hound::Sample + FromSample<T>,
 {
     let path = std::env::current_dir().unwrap().join(format!("{}.wav", Local::now().format("%Y-%m-%d_%H:%M:%S")));
-    std::fs::File::create(&path).unwrap();
+    File::create(&path).unwrap();
 
     let spec = WavSpec { channels: config.channels, bits_per_sample: 32, sample_format: hound::SampleFormat::Float, sample_rate: config.sample_rate.0};
     let mut writer = WavWriter::create(&path, spec).unwrap();
@@ -54,10 +54,8 @@ fn main() {
 
     let buff_clone = buff.clone();
     let config_clone = config.clone();
-    // let writer_clone = writer.clone();
-
     
-    let read_handle = thread::spawn(move || {
+    let _read_handle = thread::spawn(move || {
         let stream = device.build_input_stream(
             &config_clone,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
@@ -71,12 +69,12 @@ fn main() {
                 for point in data {
                     match tx.send(*point) {
                         Ok(_) => {},
-                        Err(_) => panic!("Exiting due to send channel error...")
+                        Err(_) => panic!("Exiting due to send-channel error...")
                     }
                 }
             },
             move |err| {
-                eprintln!("Failed to instantiate: {err:?}");
+                eprintln!("An error has been detected during recording: {err:?}");
             },
             None,
         ).unwrap();
@@ -84,11 +82,11 @@ fn main() {
         thread::park();
     });
 
-    let write_handle = thread::spawn(move|| {
+    let _write_handle = thread::spawn(move|| {
         loop {
             let data = match rx.recv() {
                 Ok(d) => d,
-                Err(_) => { panic!("Exiting due to recv channel error...") }
+                Err(_) => { panic!("Exiting due to recv-channel error...") }
             };
 
             let mut lock = buff_clone.lock().unwrap();
