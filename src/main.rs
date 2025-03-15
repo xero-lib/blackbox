@@ -2,9 +2,13 @@
 // #![no_main] // todo
 
 use std::{
-    fmt::Debug, fs::File, sync::{
-        mpsc::{self, Receiver, Sender}, Arc, Mutex
-    }, thread
+    fmt::Debug,
+    fs::File,
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Receiver, Sender},
+    },
+    thread,
 };
 
 use cpal::{
@@ -25,18 +29,18 @@ struct RingBuff<T> {
 }
 
 // impl<'a, T> Iterator<'a, T> for RingBuff<'a, T> {
-    
-    // returns an iterator over the properly arranged items. is no longer correct once something is pushed
-    // fn (&'a self) -> impl Iterator<Item = &'a T> {
-    //     self.contents[..self.index].iter().chain(self.contents[self.index..].iter())
-    // }
+
+// // returns an iterator over the properly arranged items. is no longer correct once something is pushed
+//     fn (&'a self) -> impl Iterator<Item = &'a T> {
+//         self.contents[..self.index].iter().chain(self.contents[self.index..].iter())
+//     }
 // }
 
 impl<T: Clone + Default> RingBuff<T> {
-    fn new<const CAP: usize>() -> Self {
+    fn new<const CAP: usize>() -> Self { // I don't really like this syntax. subject to change
         Self {
             capacity: CAP,
-            contents: { 
+            contents: {
                 let mut vec = Vec::<T>::with_capacity(CAP);
                 vec.resize(CAP, T::default());
                 vec
@@ -49,8 +53,20 @@ impl<T: Clone + Default> RingBuff<T> {
 impl<T: Clone> RingBuff<T> {
     fn vectorize(&self) -> Vec<T> {
         [
-            self.contents[..self.index].iter().clone().map(T::to_owned).collect::<Vec<T>>(),
-            self.saturated.then(|| self.contents[self.index..].iter().clone().map(T::to_owned).collect()).unwrap_or(Vec::new()),
+            self.contents[..self.index]
+                .iter()
+                .clone()
+                .map(T::to_owned)
+                .collect::<Vec<T>>(),
+            self.saturated
+                .then(|| {
+                    self.contents[self.index..]
+                        .iter()
+                        .clone()
+                        .map(T::to_owned)
+                        .collect()
+                })
+                .unwrap_or(Vec::new()),
         ]
         .into_iter()
         .flatten()
@@ -85,7 +101,9 @@ where
     };
     let mut writer = WavWriter::create(&path, spec).unwrap();
     for &sample in data {
-        writer.write_sample(sample.mul_amp(0.25f32).to_sample::<U>()).ok();
+        writer
+            .write_sample(sample.mul_amp(0.25f32).to_sample::<U>())
+            .ok();
     }
 }
 
