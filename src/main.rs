@@ -1,111 +1,21 @@
 // #![no_std] // todo
 // #![no_main] // todo
 
+mod ringbuff;
+use ringbuff::RingBuff;
+
+mod file_io;
+use file_io::write_input_data;
+
 use std::{
-    fmt::Debug,
-    fs::File,
     sync::{
-        Arc, Mutex,
         mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
     },
     thread,
 };
 
-use cpal::{
-    FromSample, Sample,
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-};
-
-use hound::{WavSpec, WavWriter};
-
-use chrono::Local;
-
-#[derive(Default)]
-struct RingBuff<T> {
-    index: usize,
-    saturated: bool,
-    pub capacity: usize,
-    contents: Vec<T>,
-}
-
-// impl<'a, T> Iterator<'a, T> for RingBuff<'a, T> {
-
-// // returns an iterator over the properly arranged items. is no longer correct once something is pushed
-//     fn (&'a self) -> impl Iterator<Item = &'a T> {
-//         self.contents[..self.index].iter().chain(self.contents[self.index..].iter())
-//     }
-// }
-
-impl<T: Clone + Default> RingBuff<T> {
-    fn new<const CAP: usize>() -> Self { // I don't really like this syntax. subject to change
-        Self {
-            capacity: CAP,
-            contents: {
-                let mut vec = Vec::<T>::with_capacity(CAP);
-                vec.resize(CAP, T::default());
-                vec
-            },
-            ..Default::default()
-        }
-    }
-}
-
-impl<T: Clone> RingBuff<T> {
-    fn vectorize(&self) -> Vec<T> {
-        [
-            self.contents[..self.index]
-                .iter()
-                .clone()
-                .map(T::to_owned)
-                .collect::<Vec<T>>(),
-            self.saturated
-                .then(|| {
-                    self.contents[self.index..]
-                        .iter()
-                        .clone()
-                        .map(T::to_owned)
-                        .collect()
-                })
-                .unwrap_or(Vec::new()),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<T>>()
-    }
-
-    fn push(&mut self, value: T) {
-        self.contents[self.index] = value;
-        if self.index == self.capacity - 1 {
-            self.index = 0;
-        } else {
-            self.index += 1;
-        }
-    }
-}
-
-fn write_input_data<T, U>(data: &Vec<T>, config: &cpal::StreamConfig)
-where
-    T: Sample<Float = f32>,
-    U: Sample + hound::Sample + FromSample<T>,
-{
-    let path = std::env::current_dir()
-        .unwrap()
-        .join(format!("{}.wav", Local::now().format("%Y-%m-%d_%H:%M:%S")));
-    File::create(&path).unwrap();
-
-    let spec = WavSpec {
-        channels: config.channels,
-        bits_per_sample: 32,
-        sample_format: hound::SampleFormat::Float,
-        sample_rate: config.sample_rate.0,
-    };
-    let mut writer = WavWriter::create(&path, spec).unwrap();
-    for &sample in data {
-        writer
-            .write_sample(sample.mul_amp(0.25f32).to_sample::<U>())
-            .ok();
-    }
-}
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 const BUFF_LEN: usize = 1 << 25;
 
@@ -118,12 +28,11 @@ fn main() {
     let device = host
         .default_input_device()
         .expect("No input devices found.");
-    print(device.supported_input_configs().unwrap().next());
 
     let config = device
         .supported_input_configs()
         .expect("No audio device configs found. Are there any connected?")
-        // .find(|cfg| cfg.sample_format() == SampleFormat::I32)
+        // .find(|cfg| cfg.sample_format() == SampleFormat::f32)
         .next()
         .unwrap()
         .with_max_sample_rate()
@@ -137,17 +46,10 @@ fn main() {
             .build_input_stream(
                 &config_clone,
                 move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    // let mut lock = buff_clone
-                    //     .lock()
-                    //     .unwrap();
-
-                    // lock.append(&mut VecDeque::from_iter(data.to_owned()));
-                    // write_input_data::<f32, f32>(data, &&writer_clone);
-                    // println!("data!");
                     for &sample in data {
                         match tx.send(sample) {
-                            Ok(_) => {}
-                            Err(_) => panic!("Exiting due to send-channel error..."),
+                            Err(e) => panic!("Exiting due to send-channel error...\n{e:#}"),
+                            _ => ()
                         }
                     }
                 },
@@ -158,6 +60,7 @@ fn main() {
             )
             .unwrap();
         stream.play().expect("Unable to record...");
+        println!("Recording started...");
         thread::park();
     });
 
@@ -191,6 +94,3 @@ fn main() {
     //TODO send signals to children to exit
 }
 
-fn print(data: impl Debug) {
-    println!("{data:?}");
-}
