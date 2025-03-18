@@ -11,7 +11,8 @@ mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    io, sync::{Arc, Mutex}, thread
+    sync::{Arc, Mutex},
+    thread,
 };
 
 use ringbuf::{
@@ -23,7 +24,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 const BUFF_LEN: usize = 1 << 25;
 
-fn main() -> Result<(), io::Error>{
+fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
     let (mut tx, mut rx) = static_rb.split();
 
@@ -71,7 +72,7 @@ fn main() -> Result<(), io::Error>{
                 |err| eprintln!("An error has been detected during recording: {err:?}"),
                 None,
             )
-            .unwrap();
+            .expect("Unable to build stream");
 
         stream.play().expect("Unable to record...");
         println!("Recording started...");
@@ -90,6 +91,4 @@ fn main() -> Result<(), io::Error>{
     }
 
     //TODO send signals to children to exit
-
-    Ok(())
 }
