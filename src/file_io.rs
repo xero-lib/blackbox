@@ -1,6 +1,6 @@
-use hound::{WavSpec, WavWriter};
-use cpal::{FromSample, Sample};
 use chrono::Local;
+use cpal::{FromSample, Sample};
+use hound::{WavSpec, WavWriter};
 use std::fs::File;
 
 pub fn write_input_data<T, U>(data: &Vec<T>, config: &cpal::StreamConfig)
@@ -21,8 +21,6 @@ where
     };
     let mut writer = WavWriter::create(&path, spec).unwrap();
     for &sample in data {
-        writer
-            .write_sample(sample.to_sample::<U>())
-            .ok();
+        writer.write_sample(sample.to_sample::<U>()).ok();
     }
 }
