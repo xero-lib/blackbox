@@ -1,14 +1,13 @@
-mod macros;
-use macros::break_if;
-
 mod ringbuff;
 use ringbuff::RingBuff;
+
+mod macros;
 
 mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicBool},
     thread,
 };
 
@@ -27,11 +26,10 @@ fn main() {
 
     let should_exit = Arc::new(AtomicBool::new(false));
 
-    //TODO create another channel for signalling termination to child threads
-    let buff = Arc::new(Mutex::new(RingBuff::<f32>::new::<BUFF_LEN>())); // probably faster/more efficient to use ringbuf crate without Arc<Mutex>
-    
-    let host_id;
+    // It's probably faster/more efficient to use ringbuf crate without Arc<Mutex>, but push_slice_overwrite isn't working
+    let buff = Arc::new(Mutex::new(RingBuff::<f32>::new::<BUFF_LEN>()));
 
+    let host_id;
     #[cfg(target_os = "linux")]
     { host_id = cpal::HostId::Jack; }
     #[cfg(target_os = "windows")]
@@ -64,18 +62,18 @@ fn main() {
                 thread::park();
             }
 
-            if should_exit_clone.load(std::sync::atomic::Ordering::Relaxed) {
-                break;
-            }
+            break_if!(should_exit_clone.load(std::sync::atomic::Ordering::Relaxed));
 
             let num_bytes = rx.pop_slice(&mut data);
             let mut lock = buff_clone.lock().unwrap();
             lock.push_slice(&data[..num_bytes]);
         }
+        
+        debug_print!("Write thread exiting...");
     });
-    
+
     let write_thread = write_handle.thread().clone();
-    
+
     // cpal has its own thread, but looking to transition away from libraries, so leaving it in its own thread for easier refactoring later
     let read_handle = thread::spawn(move || {
         let stream = device
@@ -93,31 +91,33 @@ fn main() {
         stream.play().expect("Unable to record...");
         println!("Recording started...");
         thread::park();
-        dbg!("Read-thread exiting...");
-        return;
+        debug_print!("Read-thread exiting...");
     });
 
     let mut line = String::new();
     loop {
         let _ = std::io::stdin().read_line(&mut line);
 
-        break_if!(line.trim() == "q");
+        break_if!(line.trim().starts_with("q"));
+
+        if line.trim().starts_with("h") {
+            println!("Press enter to save, or type q to quit without saving.");
+            continue;
+        }
 
         println!("Saving data...");
         let lock = buff.lock().unwrap();
         write_input_data::<f32, f32>(&lock.vectorize(), &config);
     }
-    
-    // clean up
-    
+
+    // Clean up
     should_exit.store(true, std::sync::atomic::Ordering::SeqCst);
 
     write_handle.thread().unpark();
     read_handle.thread().unpark();
 
-
     write_handle.join().unwrap();
     read_handle.join().unwrap();
-    
+
     println!("Goodbye!");
 }
