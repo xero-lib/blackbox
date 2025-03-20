@@ -1,6 +1,3 @@
-// #![no_std] // todo
-// #![no_main] // todo
-
 mod macros;
 use macros::break_if;
 
@@ -11,7 +8,7 @@ mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     thread,
 };
 
@@ -28,10 +25,22 @@ fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
     let (mut tx, mut rx) = static_rb.split();
 
+    let should_exit = Arc::new(AtomicBool::new(false));
+
     //TODO create another channel for signalling termination to child threads
     let buff = Arc::new(Mutex::new(RingBuff::<f32>::new::<BUFF_LEN>())); // probably faster/more efficient to use ringbuf crate without Arc<Mutex>
-    let host = cpal::host_from_id(cpal::HostId::Jack).unwrap_or(cpal::default_host());
-    let device = host
+    
+    let host_id;
+
+    #[cfg(target_os = "linux")]
+    { host_id = cpal::HostId::Jack; }
+    #[cfg(target_os = "windows")]
+    { host_id = cpal::HostId::Asio; }
+    #[cfg(target_os = "none")]
+    { host_id = cpal::HostId::Alsa; }
+
+    let device = cpal::host_from_id(host_id)
+        .unwrap_or(cpal::default_host())
         .default_input_device()
         .expect("No input devices found.");
 
@@ -45,6 +54,7 @@ fn main() {
 
     let buff_clone = buff.clone();
     let config_clone = config.clone();
+    let should_exit_clone = should_exit.clone();
 
     let write_handle = thread::spawn(move || {
         let mut data = Vec::<f32>::new();
@@ -54,19 +64,25 @@ fn main() {
                 thread::park();
             }
 
+            if should_exit_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+
             let num_bytes = rx.pop_slice(&mut data);
             let mut lock = buff_clone.lock().unwrap();
             lock.push_slice(&data[..num_bytes]);
         }
     });
-
+    
+    let write_thread = write_handle.thread().clone();
+    
     // cpal has its own thread, but looking to transition away from libraries, so leaving it in its own thread for easier refactoring later
-    let _read_handle = thread::spawn(move || {
+    let read_handle = thread::spawn(move || {
         let stream = device
             .build_input_stream(
                 &config_clone,
                 move |data: &[f32], _| {
-                    write_handle.thread().unpark();
+                    write_thread.unpark();
                     tx.push_slice(data);
                 },
                 |err| eprintln!("An error has been detected during recording: {err:?}"),
@@ -77,6 +93,8 @@ fn main() {
         stream.play().expect("Unable to record...");
         println!("Recording started...");
         thread::park();
+        dbg!("Read-thread exiting...");
+        return;
     });
 
     let mut line = String::new();
@@ -89,6 +107,17 @@ fn main() {
         let lock = buff.lock().unwrap();
         write_input_data::<f32, f32>(&lock.vectorize(), &config);
     }
+    
+    // clean up
+    
+    should_exit.store(true, std::sync::atomic::Ordering::SeqCst);
 
-    //TODO send signals to children to exit
+    write_handle.thread().unpark();
+    read_handle.thread().unpark();
+
+
+    write_handle.join().unwrap();
+    read_handle.join().unwrap();
+    
+    println!("Goodbye!");
 }
