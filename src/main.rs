@@ -27,7 +27,7 @@ fn main() {
     let should_exit = Arc::new(AtomicBool::new(false));
 
     // It's probably faster/more efficient to use ringbuf crate without Arc<Mutex>, but push_slice_overwrite isn't working
-    let buff = Arc::new(Mutex::new(RingBuff::<f32>::new::<BUFF_LEN>()));
+    let buff = Arc::new(Mutex::new(RingBuff::<f32, BUFF_LEN>::new()));
 
     let host_id;
     #[cfg(target_os = "linux")]

@@ -1,16 +1,15 @@
 #![allow(unused)]
 
 #[derive(Default)]
-pub struct RingBuff<T> {
+pub struct RingBuff<T, const CAP: usize> {
     index: usize,
     saturated: bool,
     contents: Vec<T>,
     pub capacity: usize,
 }
 
-impl<T: Clone + Default> RingBuff<T> {
-    pub fn new<const CAP: usize>() -> Self {
-        // I don't really like this syntax. subject to change
+impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
+    pub fn new() -> Self {
         Self {
             capacity: CAP,
             contents: {
@@ -24,7 +23,7 @@ impl<T: Clone + Default> RingBuff<T> {
 }
 
 // could do with some optimization
-impl<T: Clone> RingBuff<T> {
+impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
     pub fn vectorize(&self) -> Vec<T> {
         [
             self.contents[..self.index]
