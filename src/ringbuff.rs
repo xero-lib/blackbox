@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[derive(Default)]
 pub struct RingBuff<T> {
     index: usize,
@@ -21,6 +23,7 @@ impl<T: Clone + Default> RingBuff<T> {
     }
 }
 
+// could do with some optimization
 impl<T: Clone> RingBuff<T> {
     pub fn vectorize(&self) -> Vec<T> {
         [
@@ -62,6 +65,7 @@ impl<T: Clone> RingBuff<T> {
         self.increment_index(1);
     }
 
+    // could do with some optimization
     pub fn push_slice(&mut self, values: &[T]) {
         let dist_to_end = (self.capacity - 1) - self.index;
         if values.len() < dist_to_end {
