@@ -6,14 +6,13 @@ pub struct RingBuff<T> {
     pub capacity: usize,
 }
 
-impl<T: Clone + Default> RingBuff<T> {
-    pub fn new<const CAP: usize>() -> Self {
-        // I don't really like this syntax. subject to change
+impl<T: Clone + Copy + Default> RingBuff<T> {
+    pub fn with_capacity(cap: usize) -> Self {
         Self {
-            capacity: CAP,
+            capacity: cap,
             contents: {
-                let mut vec = Vec::<T>::with_capacity(CAP);
-                vec.resize(CAP, T::default());
+                let mut vec = Vec::with_capacity(cap);
+                vec.resize(cap, T::default());
                 vec
             },
             ..Default::default()
@@ -23,25 +22,11 @@ impl<T: Clone + Default> RingBuff<T> {
 
 impl<T: Clone> RingBuff<T> {
     pub fn vectorize(&self) -> Vec<T> {
-        [
-            self.contents[..self.index]
-                .iter()
-                .clone()
-                .map(T::to_owned)
-                .collect::<Vec<T>>(),
-            self.saturated
-                .then(|| {
-                    self.contents[self.index..]
-                        .iter()
-                        .clone()
-                        .map(T::to_owned)
-                        .collect()
-                })
-                .unwrap_or(Vec::new()),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<T>>()
+        if self.saturated {
+            self.contents[self.index..].iter().cloned().chain(self.contents[..self.index].iter().cloned()).collect()
+        } else {
+            self.contents[..self.index].to_vec()
+        }
     }
 
     // don't you dare commit this
@@ -62,22 +47,16 @@ impl<T: Clone> RingBuff<T> {
         self.increment_index(1);
     }
 
-    pub fn push_slice(&mut self, values: &[T]) {
+    pub fn push_slice(&mut self, values: &[T])
+    where T: Copy
+    {
         let dist_to_end = (self.capacity - 1) - self.index;
+
         if values.len() < dist_to_end {
-            self.contents.splice(
-                self.index..(self.index + values.len()),
-                values.iter().map(T::to_owned),
-            );
+            self.contents[self.index..][..values.len()].copy_from_slice(values);
         } else {
-            self.contents.splice(
-                self.index..(self.capacity - 1),
-                values.iter().take(dist_to_end).map(T::to_owned),
-            );
-            self.contents.splice(
-                0..values.len() - dist_to_end,
-                values.iter().skip(dist_to_end).map(T::to_owned),
-            );
+            self.contents[self.index..self.capacity - 1].copy_from_slice(&values[..dist_to_end]);
+            self.contents[..values.len() - dist_to_end ].copy_from_slice(&values[dist_to_end..]);
         }
 
         self.increment_index(values.len());

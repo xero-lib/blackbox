@@ -13,7 +13,7 @@ pub mod macros {
     macro_rules! debug_print {
         ($x:expr) => {
             #[cfg(debug_assertions)]
-            println!("{}", $x)
+            println!("{:?}", $x)
         };
     }
 }
