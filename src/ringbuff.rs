@@ -91,22 +91,20 @@ impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
     // }
 
     pub fn push_slice(&mut self, values: &[T])
-    where T: Copy
+    where
+        T: Copy,
     {
         let dist_to_end = (self.capacity - 1) - self.index;
         // does this help?
         // let values_len = values.len();
-    
+
         if values.len() < dist_to_end {
-            self.contents[self.index..][..values.len()]
-                .copy_from_slice(values);
+            self.contents[self.index..][..values.len()].copy_from_slice(values);
         } else {
-            self.contents[self.index..self.capacity - 1]
-                .copy_from_slice(&values[..dist_to_end]);
-            self.contents[0..values.len() - dist_to_end]
-                .copy_from_slice(&values[dist_to_end..]);
+            self.contents[self.index..self.capacity - 1].copy_from_slice(&values[..dist_to_end]);
+            self.contents[0..values.len() - dist_to_end].copy_from_slice(&values[dist_to_end..]);
         }
-    
+
         self.increment_index(values.len());
     }
 
@@ -122,7 +120,8 @@ impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
                 self.contents[i] = values[i - self.index].clone();
             }
         } else {
-            for i in self.index..(self.capacity) { // shouldnt need to be -1
+            for i in self.index..(self.capacity) {
+                // shouldnt need to be -1
                 self.contents[i] = values[i - self.index].clone();
             }
 

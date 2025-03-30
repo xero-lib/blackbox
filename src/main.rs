@@ -7,7 +7,8 @@ mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    sync::{atomic::AtomicBool, Arc, Mutex}, thread
+    sync::{Arc, Mutex, atomic::AtomicBool},
+    thread,
 };
 
 use ringbuf::{
@@ -31,9 +32,13 @@ fn main() {
 
     let host_id;
     #[cfg(target_os = "linux")]
-    { host_id = cpal::HostId::Jack; }
+    {
+        host_id = cpal::HostId::Jack;
+    }
     #[cfg(not(target_os = "linux"))]
-    { host_id = cpal::HostId::Asio; }
+    {
+        host_id = cpal::HostId::Asio;
+    }
 
     let device = cpal::host_from_id(host_id)
         .unwrap_or(cpal::default_host())
@@ -66,7 +71,7 @@ fn main() {
             let mut lock = buff_clone.lock().unwrap();
             lock.push_slice(&data[..num_bytes]);
         }
-        
+
         debug_print!("Write thread exiting...");
     });
 
