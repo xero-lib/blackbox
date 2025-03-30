@@ -18,8 +18,8 @@ use ringbuf::{
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-// const BUFF_LEN: usize = 1 << 25;
-const BUFF_LEN: usize = 1 << 20;
+// const BUFF_LEN: usize = 1 << 25; // around 10 minutes
+const BUFF_LEN: usize = 1 << 20; // around 21 seconds
 
 fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
