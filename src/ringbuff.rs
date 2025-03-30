@@ -6,7 +6,7 @@ pub struct RingBuff<T, const CAP: usize> {
     pub capacity: usize,
 }
 
-impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
+impl<T: Clone + Copy + Default, const CAP: usize> RingBuff<T, CAP> {
     pub fn new() -> Self {
         Self {
             capacity: CAP,
@@ -66,27 +66,47 @@ impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
         self.increment_index(1);
     }
 
-    pub fn push_slice(&mut self, values: &[T]) {
+    // pub fn push_slice(&mut self, values: &[T]) {
+    //     let dist_to_end = (self.capacity - 1) - self.index;
+    //     // does this help?
+    //     // let values_len = values.len();
+
+    //     if values.len() < dist_to_end {
+    //         self.contents.splice(
+    //             self.index..(self.index + values.len()),
+    //             values.iter().map(T::to_owned),
+    //         );
+    //     } else {
+    //         self.contents.splice(
+    //             self.index..(self.capacity - 1), // shouldnt need to be capacity - 1
+    //             values.iter().take(dist_to_end).map(T::to_owned),
+    //         );
+    //         self.contents.splice(
+    //             0..values.len() - dist_to_end,
+    //             values.iter().skip(dist_to_end).map(T::to_owned),
+    //         );
+    //     }
+
+    //     self.increment_index(values.len());
+    // }
+
+    pub fn push_slice(&mut self, values: &[T])
+    where T: Copy
+    {
         let dist_to_end = (self.capacity - 1) - self.index;
         // does this help?
         // let values_len = values.len();
-
+    
         if values.len() < dist_to_end {
-            self.contents.splice(
-                self.index..(self.index + values.len()),
-                values.iter().map(T::to_owned),
-            );
+            self.contents[self.index..][..values.len()]
+                .copy_from_slice(values);
         } else {
-            self.contents.splice(
-                self.index..(self.capacity - 1), // shouldnt need to be capacity - 1
-                values.iter().take(dist_to_end).map(T::to_owned),
-            );
-            self.contents.splice(
-                0..values.len() - dist_to_end,
-                values.iter().skip(dist_to_end).map(T::to_owned),
-            );
+            self.contents[self.index..self.capacity - 1]
+                .copy_from_slice(&values[..dist_to_end]);
+            self.contents[0..values.len() - dist_to_end]
+                .copy_from_slice(&values[dist_to_end..]);
         }
-
+    
         self.increment_index(values.len());
     }
 
