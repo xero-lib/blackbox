@@ -1,5 +1,3 @@
-#![feature(random)]
-
 mod ringbuff;
 use ringbuff::RingBuff;
 
