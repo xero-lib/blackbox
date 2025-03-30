@@ -1,3 +1,5 @@
+#![feature(random)]
+
 mod ringbuff;
 use ringbuff::RingBuff;
 
@@ -7,8 +9,7 @@ mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    sync::{Arc, Mutex, atomic::AtomicBool},
-    thread,
+    /* random::random, */sync::{atomic::AtomicBool, Arc, Mutex}, thread
 };
 
 use ringbuf::{
@@ -18,7 +19,8 @@ use ringbuf::{
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-const BUFF_LEN: usize = 1 << 25;
+// const BUFF_LEN: usize = 1 << 25;
+const BUFF_LEN: usize = 1 << 20;
 
 fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
@@ -32,10 +34,8 @@ fn main() {
     let host_id;
     #[cfg(target_os = "linux")]
     { host_id = cpal::HostId::Jack; }
-    #[cfg(target_os = "windows")]
+    #[cfg(not(target_os = "linux"))]
     { host_id = cpal::HostId::Asio; }
-    #[cfg(target_os = "none")]
-    { host_id = cpal::HostId::Alsa; }
 
     let device = cpal::host_from_id(host_id)
         .unwrap_or(cpal::default_host())
