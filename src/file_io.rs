@@ -19,6 +19,7 @@ where
         sample_format: hound::SampleFormat::Float,
         sample_rate: config.sample_rate.0,
     };
+
     let mut writer = WavWriter::create(&path, spec).unwrap();
     for &sample in data {
         writer.write_sample(sample.to_sample::<U>()).ok();
