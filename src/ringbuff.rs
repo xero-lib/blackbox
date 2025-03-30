@@ -6,7 +6,7 @@ pub struct RingBuff<T, const CAP: usize> {
     pub capacity: usize,
 }
 
-impl<T: Clone + Copy + Default, const CAP: usize> RingBuff<T, CAP> {
+impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
     pub fn new() -> Self {
         Self {
             capacity: CAP,
