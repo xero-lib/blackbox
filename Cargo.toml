@@ -7,7 +7,6 @@ edition = "2024"
 chrono = "0.4.40"
 cpal = { version = "0.15.3", features = ["asio", "jack"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
-dioxus = { version = "0.6.3", features = ["mobile", "macro", "logger"] }
 hound = "3.5.1"
 ringbuf = "0.4.7"
 
