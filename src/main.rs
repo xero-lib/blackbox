@@ -7,7 +7,7 @@ mod file_io;
 use file_io::write_input_data;
 
 use std::{
-    /* random::random, */sync::{atomic::AtomicBool, Arc, Mutex}, thread
+    sync::{atomic::AtomicBool, Arc, Mutex}, thread
 };
 
 use ringbuf::{
