@@ -5,10 +5,10 @@ mod macros;
 
 mod file_io;
 use file_io::write_input_data;
+use slint::quit_event_loop;
 
 use std::{
-    sync::{Arc, Mutex, atomic::AtomicBool},
-    thread,
+    sync::{atomic::AtomicBool, Arc, Mutex}, thread
 };
 
 use ringbuf::{
@@ -20,6 +20,29 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 // const BUFF_LEN: usize = 1 << 25; // around 10 minutes
 const BUFF_LEN: usize = 1 << 20; // around 21 seconds
+
+slint::slint! {
+    import { VerticalBox, Button } from "std-widgets.slint";
+    
+    export component MainWindow inherits Window {
+        callback save();
+        callback exit();
+        
+        VerticalBox {
+            Text {
+                text: "Recording started!";
+            }
+            Button {
+                text: "Save";
+                clicked => { save() }
+            }
+            Button {
+                text: "Exit";
+                clicked => { exit() }
+            }
+        }
+    }
+}
 
 fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
@@ -97,21 +120,36 @@ fn main() {
         debug_print!("Read-thread exiting...");
     });
 
-    let mut line = String::new();
-    loop {
-        let _ = std::io::stdin().read_line(&mut line);
-
-        break_if!(line.trim().starts_with("q"));
-
-        if line.trim().starts_with("h") {
-            println!("Press enter to save, or type q to quit without saving.");
-            continue;
-        }
-
+    let ui = MainWindow::new().unwrap();
+    ui.on_save(move || {
         println!("Saving data...");
         let lock = buff.lock().unwrap();
         write_input_data::<f32, f32>(&lock.vectorize(), &config);
-    }
+    });
+    
+    let exit = || {
+        println!("Exiting...");
+        quit_event_loop();
+    };
+
+    ui.on_exit(exit);
+
+    ui.window().on_close_requested(exit);
+    
+    ui.run().unwrap();
+
+    // let mut line = String::new();
+    // loop {
+    //     let _ = std::io::stdin().read_line(&mut line);
+
+    //     break_if!(line.trim().starts_with("q"));
+
+    //     if line.trim().starts_with("h") {
+    //         println!("Press enter to save, or type q to quit without saving.");
+    //         continue;
+    //     }
+
+    // }
 
     // Clean up
     should_exit.store(true, std::sync::atomic::Ordering::SeqCst);
