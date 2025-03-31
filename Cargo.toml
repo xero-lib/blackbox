@@ -11,16 +11,6 @@ hound = "3.5.1"
 ringbuf = "0.4.7"
 
 [[bench]]
-name = "rb_write_for"
-path = "benches/rb_benchmark.rs"
-harness = false
-
-[[bench]]
-name = "rb_write"
-path = "benches/rb_benchmark.rs"
-harness = false
-
-[[bench]]
-name = "rb_read"
+name = "rb_bench"
 path = "benches/rb_benchmark.rs"
 harness = false
