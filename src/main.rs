@@ -1,24 +1,23 @@
-mod ringbuff;
+mod ringbuff; 
 use ringbuff::RingBuff;
 
 mod macros;
 
 mod file_io;
 use file_io::write_input_data;
+// use slint::{quit_event_loop, CloseRequestResponse};
 
 use std::{
-    sync::{Arc, Mutex, atomic::AtomicBool},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     thread,
 };
 
 use ringbuf::{
-    StaticRb,
     traits::{Consumer, Observer, Producer, Split},
+    StaticRb,
 };
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-
-const BUFF_LEN: usize = 1 << 25;
+use cpal::{traits::{DeviceTrait, HostTrait, StreamTrait}, HostId};
 
 fn main() {
     let static_rb = StaticRb::<f32, 2048>::default();
@@ -26,18 +25,14 @@ fn main() {
 
     let should_exit = Arc::new(AtomicBool::new(false));
 
-    // It's probably faster/more efficient to use ringbuf crate without Arc<Mutex>, but push_slice_overwrite isn't working
-    let buff = Arc::new(Mutex::new(RingBuff::<f32, BUFF_LEN>::new()));
 
-    let host_id;
+    
     #[cfg(target_os = "linux")]
-    { host_id = cpal::HostId::Jack; }
-    #[cfg(target_os = "windows")]
-    { host_id = cpal::HostId::Asio; }
-    #[cfg(target_os = "none")]
-    { host_id = cpal::HostId::Alsa; }
+    const HOST_ID: HostId = cpal::HostId::Jack;
+    #[cfg(not(target_os = "linux"))]
+    const HOST_ID: HostId = cpal::HostId::Asio;
 
-    let device = cpal::host_from_id(host_id)
+    let device = cpal::host_from_id(HOST_ID)
         .unwrap_or(cpal::default_host())
         .default_input_device()
         .expect("No input devices found.");
@@ -49,6 +44,10 @@ fn main() {
         .expect("No audio configurations avaiable for default device...")
         .with_max_sample_rate()
         .config();
+    
+    let buff_len = config.sample_rate.0 as usize * std::env::args().skip(1).next().unwrap().parse::<usize>().expect("Did not receive a valid number of seconds.");
+    // It's probably faster/more efficient to use ringbuf crate without Arc<Mutex>, but push_slice_overwrite isn't working
+    let buff = Arc::new(Mutex::new(RingBuff::<f32>::with_capacity(buff_len)));
 
     let buff_clone = buff.clone();
     let config_clone = config.clone();
@@ -68,7 +67,7 @@ fn main() {
             let mut lock = buff_clone.lock().unwrap();
             lock.push_slice(&data[..num_bytes]);
         }
-        
+
         debug_print!("Write thread exiting...");
     });
 
@@ -94,6 +93,25 @@ fn main() {
         debug_print!("Read-thread exiting...");
     });
 
+    // let ui = MainWindow::new().unwrap();
+    // ui.on_save(move || {
+    //     println!("Saving data...");
+    //     let lock = buff.lock().unwrap();
+    //     write_input_data::<f32, f32>(&lock.vectorize(), &config);
+    // });
+
+    // ui.on_exit(|| {
+    //     println!("Exiting...");
+    //     quit_event_loop().unwrap();
+    // });
+
+    // ui.window().on_close_requested(move || {
+    //     quit_event_loop().unwrap();
+    //     CloseRequestResponse::HideWindow
+    // });
+
+    // ui.run().unwrap();
+
     let mut line = String::new();
     loop {
         let _ = std::io::stdin().read_line(&mut line);
@@ -108,6 +126,7 @@ fn main() {
         println!("Saving data...");
         let lock = buff.lock().unwrap();
         write_input_data::<f32, f32>(&lock.vectorize(), &config);
+
     }
 
     // Clean up

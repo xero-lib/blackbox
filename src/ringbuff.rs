@@ -1,20 +1,18 @@
-#![allow(unused)]
-
 #[derive(Default)]
-pub struct RingBuff<T, const CAP: usize> {
+pub struct RingBuff<T> {
     index: usize,
     saturated: bool,
     contents: Vec<T>,
     pub capacity: usize,
 }
 
-impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
-    pub fn new() -> Self {
+impl<T: Clone + Copy + Default> RingBuff<T> {
+    pub fn with_capacity(cap: usize) -> Self {
         Self {
-            capacity: CAP,
+            capacity: cap,
             contents: {
-                let mut vec = Vec::<T>::with_capacity(CAP);
-                vec.resize(CAP, T::default());
+                let mut vec = Vec::with_capacity(cap);
+                vec.resize(cap, T::default());
                 vec
             },
             ..Default::default()
@@ -22,28 +20,13 @@ impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
     }
 }
 
-// could do with some optimization
-impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
+impl<T: Clone> RingBuff<T> {
     pub fn vectorize(&self) -> Vec<T> {
-        [
-            self.contents[..self.index]
-                .iter()
-                .clone()
-                .map(T::to_owned)
-                .collect::<Vec<T>>(),
-            self.saturated
-                .then(|| {
-                    self.contents[self.index..]
-                        .iter()
-                        .clone()
-                        .map(T::to_owned)
-                        .collect()
-                })
-                .unwrap_or(Vec::new()),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<T>>()
+        if self.saturated {
+            self.contents[self.index..].iter().cloned().chain(self.contents[..self.index].iter().cloned()).collect()
+        } else {
+            self.contents[..self.index].to_vec()
+        }
     }
 
     // don't you dare commit this
@@ -64,23 +47,16 @@ impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
         self.increment_index(1);
     }
 
-    // could do with some optimization
-    pub fn push_slice(&mut self, values: &[T]) {
+    pub fn push_slice(&mut self, values: &[T])
+    where T: Copy
+    {
         let dist_to_end = (self.capacity - 1) - self.index;
+
         if values.len() < dist_to_end {
-            self.contents.splice(
-                self.index..(self.index + values.len()),
-                values.iter().map(T::to_owned),
-            );
+            self.contents[self.index..][..values.len()].copy_from_slice(values);
         } else {
-            self.contents.splice(
-                self.index..(self.capacity - 1),
-                values.iter().take(dist_to_end).map(T::to_owned),
-            );
-            self.contents.splice(
-                0..values.len() - dist_to_end,
-                values.iter().skip(dist_to_end).map(T::to_owned),
-            );
+            self.contents[self.index..self.capacity - 1].copy_from_slice(&values[..dist_to_end]);
+            self.contents[..values.len() - dist_to_end ].copy_from_slice(&values[dist_to_end..]);
         }
 
         self.increment_index(values.len());
