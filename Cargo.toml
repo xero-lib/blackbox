@@ -9,7 +9,6 @@ cpal = { version = "0.15.3", features = ["asio", "jack"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 hound = "3.5.1"
 ringbuf = "0.4.7"
-slint = { version = "1.10.0", features = ["backend-android-activity-06"] }
 
 [[bench]]
 name = "rb_bench"
