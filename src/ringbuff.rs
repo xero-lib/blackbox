@@ -1,18 +1,18 @@
 #[derive(Default)]
-pub struct RingBuff<T, const CAP: usize> {
+pub struct RingBuff<T> {
     index: usize,
     saturated: bool,
     contents: Vec<T>,
     pub capacity: usize,
 }
 
-impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
-    pub fn new() -> Self {
+impl<T: Clone + Copy + Default> RingBuff<T> {
+    pub fn with_capacity(cap: usize) -> Self {
         Self {
-            capacity: CAP,
+            capacity: cap,
             contents: {
-                let mut vec = Vec::<T>::with_capacity(CAP);
-                vec.resize(CAP, T::default());
+                let mut vec = Vec::with_capacity(cap);
+                vec.resize(cap, T::default());
                 vec
             },
             ..Default::default()
@@ -20,7 +20,7 @@ impl<T: Clone + Default, const CAP: usize> RingBuff<T, CAP> {
     }
 }
 
-impl<T: Clone, const CAP: usize> RingBuff<T, CAP> {
+impl<T: Clone> RingBuff<T> {
     pub fn vectorize(&self) -> Vec<T> {
         if self.saturated {
             self.contents[self.index..].iter().cloned().chain(self.contents[..self.index].iter().cloned()).collect()
