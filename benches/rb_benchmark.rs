@@ -11,7 +11,7 @@ fn rb_bench(c: &mut Criterion) {
             .map(|_| random::<i64>() as f32)
             .collect::<Vec<f32>>(),
     );
-    let mut rb = RingBuff::<f32, { 1 << 20 }>::new();
+    let mut rb = RingBuff::<f32>::with_capacity(1 << 20);
     c.bench_function("rb write 1 << 20", |b| {
         b.iter(|| rb.push_slice(black_box(numbers.as_slice())))
     });
