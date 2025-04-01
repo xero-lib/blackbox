@@ -24,4 +24,6 @@ where
     for &sample in data {
         writer.write_sample(sample.to_sample::<U>()).ok();
     }
+
+    println!("Recording saved to {}", path.to_str().unwrap());
 }
