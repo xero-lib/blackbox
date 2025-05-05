@@ -46,16 +46,18 @@ fn main() {
         .with_max_sample_rate()
         .config();
 
-    let buff_len = config.sample_rate.0 as usize
-        * match std::env::args().skip(1).next() {
-            Some(min) => min,
-            None => {
-                eprintln!("Did not receive argument for number of minutes to buffer...");
-                std::process::exit(1);
-            }
+    let mins = match std::env::args().skip(1).next() {
+        Some(min) => min,
+        None => {
+            eprintln!("Did not receive argument for number of minutes to buffer...");
+            std::process::exit(1);
         }
-        .parse::<usize>()
-        .expect("Did not receive a valid number of minutes.")
+    };
+
+    let buff_len = config.sample_rate.0 as usize
+        * mins
+            .parse::<usize>()
+            .expect("Did not receive a valid number of minutes.")
         * 60; // take in number of minutes to record from arguments
               // It's probably faster/more efficient to use ringbuf crate without Arc<Mutex>, but push_slice_overwrite isn't working
     let buff = Arc::new(Mutex::new(RingBuff::<f32>::with_capacity(buff_len)));
@@ -99,7 +101,7 @@ fn main() {
             .expect("Unable to build stream");
 
         stream.play().expect("Unable to record...");
-        println!("Recording started...");
+        println!("Recording started with buffer length of {mins} minutes...");
         thread::park();
         debug_print!("Read-thread exiting...");
     });
